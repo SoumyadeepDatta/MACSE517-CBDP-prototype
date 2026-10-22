@@ -1,7 +1,6 @@
 import os
 import re
 import uuid
-import shutil
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, session
 from ftplib import FTP
@@ -25,11 +24,6 @@ FTP_PORT = 2123
 SEATING_REPORT_FILENAME = "SeatingReport.xlsx"
 # Finished absentee workbooks are stored in a separate folder on the server.
 ABSENTEE_FOLDER = "absentee_reports"
-
-# Where the failsafe copy lands when the OS firewall blocks the FTP data port.
-SIMULATED_INBOX = os.path.abspath(
-    os.path.join(os.getcwd(), "..", "ftp_service", "FTP_INBOX_PUBLIC")
-)
 
 # Parsed seating data cached per login token so we do not re-download and
 # re-parse the workbook on every single student lookup.
@@ -81,35 +75,20 @@ def load_seating_rows(xlsx_path):
 
 
 def fetch_seating_report(username, password):
-    """Download the seating report from the FTP server and parse it.
+    """Download the seating report from the FTP server over real FTP and parse it.
 
-    Mirrors the firewall-bypass failsafe already used for uploads: if the OS
-    blocks the FTP data channel we read the file directly from the shared
-    inbox instead, so the prototype keeps working.
+    Login (control channel) enforces the credentials; the file bytes are
+    transferred with RETR over the FTP data channel.
     """
     local_path = os.path.join(app.config["UPLOAD_FOLDER"], f"seating_{uuid.uuid4().hex[:8]}.xlsx")
 
-    # Authentication happens on the FTP control channel, which the firewall does
-    # NOT block. Let a bad login raise so credentials are actually enforced; the
-    # failsafe below is only for the (blocked) data transfer, not for auth.
     ftp = FTP()
     ftp.connect(FTP_HOST, FTP_PORT)
     ftp.login(user=username, passwd=password)
     ftp.set_pasv(True)
-
-    try:
-        with open(local_path, "wb") as f:
-            ftp.retrbinary(f"RETR {SEATING_REPORT_FILENAME}", f.write)
-        ftp.quit()
-    except Exception as e:
-        # FAILSAFE: firewall blocked the FTP data port -> read it directly.
-        print(f"FTP Retrieve Blocked: {e}")
-        try:
-            ftp.quit()
-        except Exception:
-            pass
-        source = os.path.join(SIMULATED_INBOX, SEATING_REPORT_FILENAME)
-        shutil.copy(source, local_path)
+    with open(local_path, "wb") as f:
+        ftp.retrbinary(f"RETR {SEATING_REPORT_FILENAME}", f.write)
+    ftp.quit()
 
     rows = load_seating_rows(local_path)
     try:
@@ -193,41 +172,24 @@ def make_absentee_workbook(students, out_path):
 def send_report_to_server(username, password, local_path, filename):
     """Upload the absentee workbook to a separate folder on the FTP server.
 
-    Keeps the exact firewall-bypass failsafe already in the project: if the OS
-    blocks the FTP data port, copy the file straight into the shared inbox
-    (under the same separate folder) so the transfer still succeeds.
+    Login (control channel) enforces the credentials; the file is stored into
+    the ABSENTEE_FOLDER with STOR over the FTP data channel.
     """
-    # Authenticate on the control channel first (not firewall-blocked); only the
-    # data transfer below falls back to the firewall-bypass failsafe.
     ftp = FTP()
     ftp.connect(FTP_HOST, FTP_PORT)
     ftp.login(user=username, passwd=password)
     ftp.set_pasv(True)
 
+    # Ensure the separate folder exists on the server, then store into it.
     try:
-        # Ensure the separate folder exists on the server, then store into it.
-        try:
-            ftp.mkd(ABSENTEE_FOLDER)
-        except Exception:
-            pass  # already exists
-        ftp.cwd(ABSENTEE_FOLDER)
+        ftp.mkd(ABSENTEE_FOLDER)
+    except Exception:
+        pass  # already exists
+    ftp.cwd(ABSENTEE_FOLDER)
 
-        with open(local_path, "rb") as f:
-            ftp.storbinary(f"STOR {filename}", f)
-        ftp.quit()
-        return "FTP", None
-
-    except Exception as e:
-        # FAILSAFE: local firewall blocked the FTP data port -> direct copy.
-        print(f"FTP Transfer Blocked: {e}")
-        try:
-            ftp.quit()
-        except Exception:
-            pass
-        dest_dir = os.path.join(SIMULATED_INBOX, ABSENTEE_FOLDER)
-        os.makedirs(dest_dir, exist_ok=True)
-        shutil.copy(local_path, os.path.join(dest_dir, filename))
-        return "FAILSAFE", str(e)
+    with open(local_path, "rb") as f:
+        ftp.storbinary(f"STOR {filename}", f)
+    ftp.quit()
 
 
 @app.route("/")
@@ -371,7 +333,7 @@ def finalize():
     local_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{uuid.uuid4().hex[:8]}_{filename}")
     make_absentee_workbook(students, local_path)
 
-    mode, err = send_report_to_server(
+    send_report_to_server(
         session.get("username"), session.get("password"), local_path, filename
     )
     try:
@@ -382,7 +344,7 @@ def finalize():
     # Clear the list so a new session can start fresh.
     ABSENTEE_LISTS[token] = []
 
-    return render_template("result.html", filename=filename, folder=ABSENTEE_FOLDER, mode=mode, err=err)
+    return render_template("result.html", filename=filename, folder=ABSENTEE_FOLDER)
 
 
 if __name__ == "__main__":

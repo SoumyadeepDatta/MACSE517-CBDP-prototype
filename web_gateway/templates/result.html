@@ -6,16 +6,9 @@
 </head>
 
 <body>
-    {% if mode == "FTP" %}
     <h3>Success!</h3>
     <p>Absentee list <b>{{ filename }}</b> transferred via standard FTP to the
        server folder <b>{{ folder }}</b>.</p>
-    {% else %}
-    <h3>Prototype Failsafe Activated</h3>
-    <p>Your PC's firewall blocked the FTP data port (Error: {{ err }}), but the
-       system bypassed it and copied <b>{{ filename }}</b> directly into the
-       server folder <b>{{ folder }}</b> to keep the prototype working.</p>
-    {% endif %}
 
     <p><a href="/form">Start a new absentee list</a> (same date/session/venue)</p>
     <p><a href="/logout">Log out</a> to change your date/session/venue.</p>

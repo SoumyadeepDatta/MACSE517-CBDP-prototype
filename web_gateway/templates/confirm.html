@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Confirm Submission</title>
+</head>
+
+<body>
+    <h2>Are you sure you want to submit?</h2>
+    <p>The following {{ students|length }} student(s) will be sent to the server as an absentee list:</p>
+
+    <ol>
+        {% for s in students %}
+        <li>{{ s.reg_no }} &mdash; {{ s.name }} (Venue {{ s.venue }}, Seat {{ s.seat }})</li>
+        {% endfor %}
+    </ol>
+
+    <!-- Yes -> generate + transfer the workbook -->
+    <form action="/finalize" method="POST" style="display:inline">
+        <button type="submit">Yes</button>
+    </form>
+
+    <!-- No -> go back to the form -->
+    <form action="/form" method="GET" style="display:inline">
+        <button type="submit">No</button>
+    </form>
+</body>
+
+</html>

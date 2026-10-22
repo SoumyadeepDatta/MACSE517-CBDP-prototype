@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Mark Absentee</title>
+</head>
+
+<body>
+    <h2>Add Absentee Student</h2>
+
+    <!-- Fixed for this login session (set on the context page) -->
+    <p><b>Your session:</b>
+       Date {{ ctx.date }} | Session {{ ctx.session }} | Venue {{ ctx.venue }}
+       &nbsp;(<a href="/logout">log out to change</a>)</p>
+
+    <p>Enter only the target student's seat row and column. The system finds the
+       student's registration number and name from the seating report.</p>
+
+    {% if message %}
+    <p><b>{{ message }}</b></p>
+    {% endif %}
+    {% if error %}
+    <p><b>{{ error }}</b></p>
+    {% endif %}
+
+    <form action="/add" method="POST">
+        <label>Seat Row number:</label><br>
+        <input type="text" name="seat_row" required><br><br>
+
+        <label>Seat Column number:</label><br>
+        <input type="text" name="seat_col" required><br><br>
+
+        <button type="submit">Add to list</button>
+    </form>
+
+    <h3>Current Absentee List ({{ students|length }})</h3>
+    {% if students %}
+    <ol>
+        {% for s in students %}
+        <li>{{ s.reg_no }} &mdash; {{ s.name }} (Venue {{ s.venue }}, Seat {{ s.seat }})</li>
+        {% endfor %}
+    </ol>
+
+    <!-- "Add another" = just fill the form above again. Or submit the list: -->
+    <form action="/confirm" method="GET">
+        <button type="submit">Submit</button>
+    </form>
+    {% else %}
+    <p>No students added yet.</p>
+    {% endif %}
+</body>
+
+</html>

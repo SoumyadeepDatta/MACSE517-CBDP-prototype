@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Session Context</title>
+</head>
+
+<body>
+    <h2>Where &amp; When Are You?</h2>
+    <p>Enter your current exam details. After you confirm, these stay fixed for
+       the whole login session &mdash; you can change them only by logging out
+       and logging in again.</p>
+
+    <form action="/set_context" method="POST">
+        <label>Exam Date (e.g. 03-03-2019):</label><br>
+        <input type="text" name="date" required><br><br>
+
+        <label>Session (e.g. AN):</label><br>
+        <input type="text" name="session" required><br><br>
+
+        <label>Venue / Room (e.g. SJT315):</label><br>
+        <input type="text" name="venue" required><br><br>
+
+        <button type="submit">Confirm</button>
+    </form>
+
+    <p><a href="/logout">Log out</a></p>
+</body>
+
+</html>
